@@ -1,0 +1,7 @@
+bypass:
+  time_seconds: 10
+  max_passes: 4
+pitch:
+  length: 120
+  width: 80
+  final_third_x: 80   # opponent entering your defensive final third if x >= 80
