@@ -1,0 +1,24 @@
+dm-bypass/
+  config/            # knobs and dials for the project (YAML)
+  data/
+    raw/             # original StatsBomb JSON (never edited)
+    processed/       # cleaned/derived tables (Parquet/CSV) for modeling & plots
+  notebooks/         # exploratory notebooks, quick checks & EDA (not core pipeline)
+  src/
+    ingest/          # code to read SB JSON and normalize to tidy tables
+    possessions/     # code to reconstruct opponent possessions
+    label/           # code to label possessions as "bypassed" (0/1)
+    features/        # code to create model inputs (pressure, zones, timing, etc.)
+    split/           # code for train/valid/test splits (time-based)
+    train/           # training scripts (logistic regression, LightGBM)
+    evaluate/        # metrics, calibration, confusion matrices
+    explain/         # feature importance, SHAP, partial dependence
+    utils/           # small helpers reused across modules
+  models/            # saved models and metrics (not committed to git)
+  reports/
+    figures/         # plots exported for paper and dashboard (not committed to git)
+  dashboard/         # Streamlit app to explore results & what-ifs
+  paper/             # manuscript outline, tables, references, exported figures
+  README.md          # quickstart, how to run, project overview
+  requirements.txt   # Python dependencies
+  .gitignore         # keep venv/data/models/figures out of git
