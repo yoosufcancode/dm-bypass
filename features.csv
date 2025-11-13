@@ -1,0 +1,138 @@
+Group,Feature,Description,Formula,Group
+Defensive Actions in Midfield - Interception Features,midfield_interceptions_total,Total number of interceptions by Barcelona in midfield (40 ≤ x ≤ 80),len(events[(events['type_name'] == 'Interception') & (events['team.id'] == 217) & (events['x'] >= 40) & (events['x'] <= 80)]),APPROVED
+,midfield_interceptions_per_possession,Average interceptions per opponent possession,midfield_interceptions_total / opponent_possessions.nunique(),
+,midfield_interception_success_rate,"Percentage of successful interceptions (outcome = ""Success In Play"")",len(successful_interceptions) / midfield_interceptions_total if midfield_interceptions_total > 0 else 0,
+,midfield_interceptions_central,"Interceptions in central midfield (40 ≤ x ≤ 80,30 ≤ y ≤ 50)",len(midfield_interceptions[(midfield_interceptions['y'] >= 30) & (midfield_interceptions['y'] <= 50)]),
+,midfield_interceptions_wide,Interceptions in wide midfield areas,len(midfield_interceptions[(midfield_interceptions['y'] < 30) | (midfield_interceptions['y'] > 50)]),
+,midfield_interceptions_progressive,Interceptions of progressive passes (passes moving forward >10m by x axis),Count of interceptions where related pass has pass.length > 10 AND pass.end_location[0] > pass.x + 5,
+,midfield_interception_time_to_event,Average time from possession start to first interception,mean((interception_times - possession_start_times).total_seconds()),
+Defensive Actions in Midfield - Ball Recovery Features,midfield_recoveries_total,Total ball recoveries in midfield zone,len(events[(events['type_name'] == 'Ball Recovery') & (events['team.id'] == 217) & (events['x'] >= 40) & (events['x'] <= 80)]),APPROVED
+,midfield_recovery_rate,Recoveries per minute in midfield,midfield_recoveries_total / match_duration_minutes,
+,midfield_recovery_success_rate,Percentage without recovery_failure = true,len(successful_recoveries) / midfield_recoveries_total if midfield_recoveries_total > 0 else 0,
+,midfield_recoveries_after_pressure,Recoveries following pressure events,Count of recoveries with pressure events in same possession before recovery,
+,midfield_recovery_locations_x,Mean x-coordinate of recovery locations,midfield_recoveries['x'].mean(),
+,midfield_recovery_locations_y,Mean y-coordinate of recovery locations,midfield_recoveries['y'].mean(),
+,midfield_recovery_time_to_event,Time from possession start to recovery,mean((recovery_times - possession_start_times).total_seconds()),
+Defensive Actions in Midfield - Duel Features,midfield_duels_total,Total duels in midfield,len(events[(events['type_name'] == 'Duel') & (events['team.id'] == 217) & (events['x'] >= 40) & (events['x'] <= 80)]),APPROVED 
+,midfield_duel_win_rate,"Percentage of duels won (outcome contains ""Won"")",len(won_duels) / midfield_duels_total if midfield_duels_total > 0 else 0,
+,midfield_aerial_duels_won,Aerial duels won in midfield,"len(aerial_duels[aerial_duels['duel.outcome.name'].str.contains('Won',na=False)])",
+,midfield_ground_duels_won,Ground duels won in midfield,"len(ground_duels[ground_duels['duel.outcome.name'].str.contains('Won', na=False)])",
+,midfield_duels_under_pressure,Duels won while under pressure,len(midfield_duels[midfield_duels['under_pressure'].fillna(False) == True]),
+,midfield_duel_locations,Spatial distribution of duels,"{'x_mean': midfield_duels['x'].mean(), 'x_std': midfield_duels['x'].std(), 'y_mean': midfield_duels['y'].mean(), 'y_std': midfield_duels['y'].std()}",
+Pressure and Tempo Features - Pressure Intensity Features,midfield_pressure_events_total,Total events where under_pressure = true for opponents in midfield,len(opponent_midfield_events[opponent_midfield_events['under_pressure'].fillna(False) == True]),APPROVED
+,midfield_pressure_rate,Pressure events per minute in midfield,midfield_pressure_events_total / match_duration_minutes,
+,midfield_pressure_in_first_5s,Number of pressure events within first 5 seconds of opponent possession,Count of pressure events where (timestamp - possession_start) <= 5 seconds,
+,midfield_pressure_in_first_10s,Number of pressure events within first 10 seconds,Count of pressure events where (timestamp - possession_start) <= 10 seconds,
+,midfield_time_to_first_pressure,Average time from possession start to first pressure event,mean((first_pressure_timestamp - possession_start_times).total_seconds()),
+,midfield_pressure_zones,Pressure distribution across midfield zones (left/center/right),"{'left': count(y < 26.67),'center': count(26.67 ≤ y ≤ 53.33),'right': count(y > 53.33)}",
+,midfield_pressure_on_passes,Pressure applied during opponent passes,len(opponent_passes_midfield[opponent_passes_midfield['under_pressure'].fillna(False) == True]),
+,midfield_pressure_on_receipts,Pressure applied during ball receipts,len(opponent_receipts_midfield[opponent_receipts_midfield['under_pressure'].fillna(False) == True]),
+Pressure and Tempo Features - Tempo Features,midfield_reaction_time,Average time between opponent event and Barcelona defensive action,mean(time_diff between opponent_event and next_barca_defensive_action),APPROVED
+,midfield_pressing_intensity,Events per second in first 10 seconds of opponent possession,mean(len(events_in_10s) / 10.0 per possession),
+,midfield_immediate_pressure_rate,Percentage of opponent events pressured within 2 seconds,immediate_pressures / total_opponent_events,
+,midfield_pressure_persistence,Duration of sustained pressure sequences,mean((sequence_end - sequence_start).total_seconds()),
+Access Control Features - Progressive Pass Prevention,progressive_passes_allowed_midfield,Number of progressive passes allowed through midfield (pass length > 10m AND end_x > start_x + 5m),len(opponent_passes[(opponent_passes['pass.length'] > 10) & (opponent_passes['pass.end_location[0]'] > opponent_passes['x'] + 5)]),APPROVED
+,progressive_pass_prevention_rate,Percentage of progressive passes intercepted/blocked,intercepted_progressive_passes / total_progressive_passes,
+,progressive_passes_central_lane,Progressive passes through central lane (35 ≤ y ≤ 45),len(progressive_passes[(progressive_passes['y'] >= 35) & (progressive_passes['y'] <= 45)]),
+,progressive_passes_wide,Progressive passes through wide areas,len(progressive_passes[(progressive_passes['y'] < 35) | (progressive_passes['y'] > 45)]),
+,progressive_pass_distance_allowed,Average distance of progressive passes allowed,progressive_passes['pass.length'].mean(),
+,progressive_pass_angle_allowed,Average angle of progressive passes (forward vs. sideways),progressive_passes['pass.angle'].mean(),
+Access Control Features - Through Ball Prevention,through_balls_allowed_midfield,Through balls allowed in midfield,len(opponent_passes[opponent_passes['pass.through_ball'] == True]),APPROVED
+,through_ball_prevention_rate,Percentage of through ball attempts intercepted,len(intercepted_through_balls) / total_through_balls,
+,through_balls_ending_final_third,Through balls that reach final third,len(through_balls[through_balls['pass.end_location'][0] > 80]),
+Access Control Features - Switch Prevention,switches_allowed_midfield,Long switches allowed through midfield,len(opponent_passes[opponent_passes['pass.switch'] == True]),APPROVED
+,switch_prevention_rate,Percentage of switches intercepted,len(intercepted_switches) / total_switches,
+,switch_distance_allowed,Average distance of switches allowed,switches['pass.length'].mean(),
+Spatial and Compactness Features - Compactness Proxies,midfield_defensive_width,Width of defensive shape in midfield (max_y - min_y of defensive events),mean((defensive_events.groupby('possession')['y'].max() - defensive_events.groupby('possession')['y'].min())),APPRROVED
+,midfield_defensive_depth,Depth of defensive shape (max_x - min_x),mean((defensive_events.groupby('possession')['x'].max() - defensive_events.groupby('possession')['x'].min())),
+,midfield_player_density,Average number of Barcelona players in midfield zone per event,mean(players_in_midfield_per_event),
+,midfield_compactness_index,Ratio of width to depth (lower = more compact),midfield_defensive_width / midfield_defensive_depth,
+,midfield_central_concentration,Percentage of defensive actions in central zone (35 ≤ y ≤ 45),len(central_actions) / len(defensive_actions),
+Spatial and Compactness Features - Zone Coverage Features,midfield_left_zone_coverage,Defensive actions in left midfield (y < 40),len(defensive_actions[defensive_actions['y'] < 40]),APPROVED
+,midfield_central_zone_coverage,Defensive actions in central midfield (35 ≤ y ≤ 45),len(defensive_actions[(defensive_actions['y'] >= 35) & (defensive_actions['y'] <= 45)]),
+,midfield_right_zone_coverage,Defensive actions in right midfield (y > 40),len(defensive_actions[defensive_actions['y'] > 40]),
+,midfield_zone_balance,Standard deviation of coverage across zones (lower = more balanced),"std([left_coverage,central_coverage, right_coverage])",
+,midfield_coverage_gaps,Identification of zones with minimal defensive presence,List of grid zones where coverage < threshold (5% of mean),
+Spatial and Compactness Features - Spatial Distribution Features,midfield_defensive_actions_x_mean,Mean x-coordinate of defensive actions,defensive_actions['x'].mean(),APPROVED
+,midfield_defensive_actions_y_mean,Mean y-coordinate of defensive actions,defensive_actions['y'].mean(),
+,midfield_defensive_actions_x_std,Standard deviation of x-coordinates,defensive_actions['x'].std(),
+,midfield_defensive_actions_y_std,Standard deviation of y-coordinates,defensive_actions['y'].std(),
+,midfield_defensive_actions_clustering,Spatial clustering coefficient,1 / (mean_nearest_neighbor_distance + 1e-6),
+Passing Through Midfield Features - Pass Prevention Features,passes_allowed_midfield_total,Total opponent passes in midfield,len(events[(events['type_name'] == 'Pass') & (events['possession_team.id'] != 217) & (events['x'] >= 40) & (events['x'] <= 80)]),APPROVED
+,passes_intercepted_midfield,Passes intercepted in midfield,len(opponent_passes_midfield[opponent_passes_midfield['pass.outcome.name'] == 'Incomplete']),
+,pass_completion_rate_allowed_midfield,Opponent pass completion rate in midfield,completed_passes / total_passes,
+,passes_allowed_forward,Forward passes allowed (end_x > start_x),len(passes_with_end[passes_with_end['pass.end_location'][0] > passes_with_end['x']]),
+,passes_allowed_backward,Backward passes allowed,len(passes_with_end[passes_with_end['pass.end_location'][0] < passes_with_end['x']]),
+,passes_allowed_lateral,Lateral passes allowed (|end_y - start_y| > |end_x - start_x|),Count where abs(end_y - start_y) > abs(end_x - start_x),
+,average_pass_length_allowed,Average length of passes allowed,opponent_passes_midfield['pass.length'].mean(),
+,long_passes_allowed_midfield,Passes > 20m allowed,len(opponent_passes_midfield[opponent_passes_midfield['pass.length'] > 20]),
+Passing Through Midfield Features - Pass Sequence Features,consecutive_passes_allowed_midfield,Average consecutive passes allowed before intervention,mean(passes_before_first_intervention per possession),APPROVED
+,pass_sequence_length_allowed,Average length of pass sequences in midfield,mean(len(passes) per possession),
+,pass_chain_break_rate,Percentage of pass sequences broken by Barcelona,broken_sequences / total_pass_sequences,
+,passes_before_interception,Average number of passes before interception,mean(passes_count before each interception),
+Passing Through Midfield Features - Pass Direction Features,passes_allowed_left_to_right,Passes moving from left to right,len(passes_with_end[passes_with_end['y'] < passes_with_end['pass.end_location'][1]]),APPROVED
+,passes_allowed_right_to_left,Passes moving from right to left,len(passes_with_end[passes_with_end['y'] > passes_with_end['pass.end_location'][1]]),
+,passes_allowed_center_to_wide,Passes from center to wide areas,"len(passes where start_y in [35,45] and end_y outside [35,45])",
+,passes_allowed_wide_to_center,Passes from wide to center,"len(passes where start_y outside [35,45] and end_y in [35,45])",
+,passes_allowed_defensive_to_final,Passes from defensive third through midfield to final third,Count of passes where start_x < 40 and end_x > 80 per possession,
+Carrying Through Midfield Features - Carry Prevention Features,carries_allowed_midfield_total,Total opponent carries in midfield,len(events[(events['type_name'] == 'Carry') & (events['possession_team.id'] != 217) & (events['x'] >= 40) & (events['x'] <= 80)]),APPROVED
+,carries_interrupted_midfield,Carries interrupted by Barcelona actions,Count of carries with Barcelona defensive action within 2 seconds,
+,carry_distance_allowed,Average distance of carries allowed,mean(sqrt((carry.end_location[0] - x)^2 + (carry.end_location[1] - y)^2)),
+,carries_entering_midfield,Carries that enter midfield from defensive third,len(carries where start_x < 40 and end_x >= 40),
+,carries_exiting_midfield,Carries that exit midfield to final third,len(carries where start_x <= 80 and end_x > 80),
+,carries_through_midfield,Carries that traverse entire midfield zone,len(carries where start_x < 40 and end_x > 80),
+,carry_progression_allowed,Average forward progression of carries (end_x - start_x),mean(carry.end_location[0] - start_x),
+Carrying Through Midfield Features - Carry Direction Features,carries_forward_allowed,Forward carries (end_x > start_x),len(carries_with_end[carries_with_end['carry.end_location'][0] > carries_with_end['x']]),APPROVED
+,carries_lateral_allowed,Lateral carries,Count where abs(end_y - start_y) > abs(end_x - start_x),
+,carries_central_lane,Carries through central lane,len(carries_with_end[(carries_with_end['y'] >= 35) & (carries_with_end['y'] <= 45)]),
+,carries_wide_areas,Carries through wide areas,len(carries_with_end[(carries_with_end['y'] < 35) | (carries_with_end['y'] > 45)]),
+Recovery and Transition Features - Transition Features,midfield_transition_recoveries,Recoveries during opponent transitions,Count of recoveries within 3 seconds of possession change,APPROVED
+,midfield_counter_press_events,Defensive actions within 5 seconds of losing possession,Count of Barcelona defensive actions within 5s of possession loss,
+,midfield_transition_to_attack,Time from recovery to first attacking action,mean((first_attacking_action_timestamp - recovery_timestamp).total_seconds()),
+,midfield_recovery_location_quality,Quality of recovery locations (higher x = better),midfield_recoveries['x'].mean(),
+Recovery and Transition Features - Possession Transition Features,possession_won_midfield,Possessions won in midfield,Count of possessions starting in midfield with Barcelona gaining possession,APPROVED
+,possession_lost_midfield,Possessions lost in midfield,Count of Barcelona possessions lost in midfield (Dispossessed/Miscontrol/Error),
+,midfield_possession_win_rate,Percentage of midfield duels/contests won,barca_won_duels / total_duels,
+,midfield_turnover_rate,Rate of forcing opponent turnovers in midfield,turnovers_forced / total_opponent_possessions,
+Temporal Features - Time-Based Features,midfield_action_timing_mean,Mean time of defensive actions within possession,mean((action_timestamp - possession_start).total_seconds()),APPROVED
+,midfield_action_timing_std,Standard deviation of action timing,std((action_timestamp - possession_start).total_seconds()),
+,midfield_early_interventions,Actions within first 3 seconds of possession,len([t for t in action_times if t <= 3]),
+,midfield_late_interventions,Actions after 10 seconds of possession,len([t for t in action_times if t > 10]),
+,midfield_sustained_pressure_duration,Average duration of pressure sequences,mean((pressure_sequence_end - pressure_sequence_start).total_seconds()),
+Temporal Features - Possession Duration Features,opponent_possession_duration_midfield,Average duration of opponent possessions in midfield,mean((possession_end - possession_start).total_seconds()),APPROVED
+,possession_termination_rate,Rate at which opponent possessions are terminated in midfield,possessions_ended_in_midfield / total_opponent_possessions,
+,time_to_possession_end,Average time from midfield entry to possession end,mean((possession_end - midfield_entry_time).total_seconds()),
+9. Zone-Specific Features - Defensive Third to Midfield Transition,defensive_to_midfield_passes_allowed,Passes from defensive third (x < 40) entering midfield,len(passes where start_x < 40 and end_x >= 40),APPROVED
+,defensive_to_midfield_carries_allowed,Carries from defensive third entering midfield,len(carries where start_x < 40 and end_x >= 40),
+,defensive_to_midfield_prevention_rate,Percentage of transitions prevented,1 - (successful_transitions / total_transition_attempts),
+,defensive_to_midfield_interception_rate,Interceptions at midfield entry point,len(interceptions where 38 ≤ x ≤ 42) / total_transition_attempts,
+9. Zone-Specific Features - Midfield to Final Third Transition,midfield_to_final_passes_allowed,Passes from midfield (40 ≤ x ≤ 80) entering final third (x > 80),len(passes where 40 ≤ start_x ≤ 80 and end_x > 80),APPROVED 
+,midfield_to_final_carries_allowed,Carries from midfield entering final third,len(carries where 40 ≤ start_x ≤ 80 and end_x > 80),
+,midfield_to_final_prevention_rate,Percentage of transitions prevented,1 - (successful_transitions / total_transition_attempts),
+,midfield_to_final_interception_rate,Interceptions at midfield exit point,len(interceptions at exit point) / total_exit_attempts,
+,bypass_attempts_total,Total attempts to bypass midfield (reach final third from defensive third),Count of possessions where start_x < 40 and max_x > 80,
+,bypass_prevention_rate,Overall bypass prevention rate,1 - (bypass_attempts / total_opponent_possessions),
+10. Player Position and Role Features - Midfielder-Specific Features,midfielder_interceptions_per_player,Interceptions by each midfielder,groupby('player.id')['interception'].sum() for midfielders,APPROVED 
+,midfielder_recoveries_per_player,Recoveries by each midfielder,groupby('player.id')['ball_recovery'].sum() for midfielders,
+,midfielder_pressures_per_player,Pressure events applied by each midfielder,groupby('player.id')['pressure'].count() for midfielders,
+,midfielder_duel_win_rate_per_player,Duel win rate by each midfielder,groupby('player.id')['duel_won'].sum() / groupby('player.id')['duel'].count(),
+,midfielder_zone_coverage,Spatial coverage by each midfielder,"groupby('player.id')['x' ,'y'].agg(['mean', 'std'])",
+10. Player Position and Role Features - Formation and Tactical Features,formation_type,Formation used (from Starting XI),Extract from events[(events['type_name'] == 'Starting XI') & (events['team.id'] == 217)]['tactics.formation'],APPROVED
+,midfield_player_count,Number of players in midfield positions,len([p for p in lineup if 'Midfield' in p['position.name'] or 'Center' in p['position.name']]),
+,midfield_width_utilization,How wide midfielders are positioned,midfielder_events['y'].std(),
+,midfield_depth_utilization,How deep/advanced midfielders are positioned,midfielder_events['x'].mean(),
+11. Advanced Composite Features - Midfield Strength Index,midfield_strength_index,Composite metric combining multiple features,0.25 * normalized_interception_rate + 0.25 * normalized_recovery_rate + 0.20 * normalized_pressure_intensity + 0.20 * bypass_prevention_rate + 0.10 * (1 - normalized_compactness_index),NOT APPROVED
+11. Advanced Composite Features - Bypass Risk Score,bypass_risk_score,Probability of bypass given current features,Model prediction based on current state features,NOT APPROVED
+,bypass_risk_factors,Key factors contributing to high risk,List of features with high contribution to risk score,
+11. Advanced Composite Features - Defensive Efficiency Metrics,defensive_action_efficiency,Successful defensive actions per 100 opponent events,successful_defensive_actions / (total_opponent_events / 100),NOT APPROVED
+,pressure_to_interception_ratio,Interceptions per pressure event,midfield_interceptions_total / midfield_pressure_events_total,
+,recovery_quality_score,Average x-coordinate of recoveries (higher = better),midfield_recoveries['x'].mean(),
+12. Contextual Features - Match Context Features,score_differential,Barcelona goals - Opponent goals at time of possession,Extract from match state at event timestamp,APPROVED
+,match_minute,Minute of match,Extract from events['minute'],
+,period,First half (1) or second half (2),Extract from events['period'],
+,home_away,Home or away match,Extract from match metadata,
+,time_since_last_goal,Time since last goal scored,Calculate from goal events timestamps,
+12. Contextual Features - Play Pattern Features,play_pattern_regular,Regular play possessions,Count where play_pattern.name == 'Regular Play',APPROVED
+,play_pattern_set_piece,"Set piece possessions (free kick,corner, etc.)","Count where play_pattern.name in ['From Free Kick', 'From Corner', 'From Throw In']",
+,play_pattern_transition,Transition possessions,Count where play_pattern indicates transition,
+,play_pattern_counter_attack,Counter attack possessions,Count where play_pattern indicates counter attack,
