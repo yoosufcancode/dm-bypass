@@ -8,3 +8,5 @@ shap>=0.45
 pyyaml>=6.0
 mplsoccer>=1.2
 streamlit>=1.37
+
+# pip install -r requirements.txt
