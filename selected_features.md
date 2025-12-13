@@ -67,6 +67,7 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Total carries
 - **StatBomb Columns**: `type.name == 'Carry'`, `player.id`
 - **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
 
 ### final_third_carries
 - **Category**: Carrying & Dribbling
@@ -97,6 +98,28 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Success of carries attempted under pressure
 - **StatBomb Columns**: `type.name == 'Carry'`, `under_pressure`, `subsequent outcome`
 - **Aggregation**: successful_pressured_carries / pressured_carries
+- **Note**: ⚠️ Calculation error detected in current implementation
+
+### successful_dribbles
+- **Category**: Carrying & Dribbling
+- **Description**: 1v1 take-ons won
+- **StatBomb Columns**: `type.name == 'Duel'`, `duel.type.name == 'Tackle'`, `duel.outcome.name` contains 'Won', `player.id`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
+
+### carries_leading_to_shot
+- **Category**: Carrying & Dribbling
+- **Description**: Carries culminating in team shot
+- **StatBomb Columns**: `carry.id` referenced by `shot.carry_id`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
+
+### carries_leading_to_key_pass
+- **Category**: Carrying & Dribbling
+- **Description**: Carries ending in key pass/assist
+- **StatBomb Columns**: `carry.id` referenced by `pass.carry_id`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
 
 ## Defensive Contribution
 
@@ -154,6 +177,20 @@ This document lists the features selected for analysis based on the EDA review.
 - **StatBomb Columns**: `under_pressure`, `possession change`
 - **Aggregation**: forced_turnovers / pressures_applied
 
+### blocked_passes
+- **Category**: Defensive Contribution
+- **Description**: Pass blocks made
+- **StatBomb Columns**: `type.name == 'Block'`, `block.block_type == 'Pass Block'`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
+
+### blocked_shots
+- **Category**: Defensive Contribution
+- **Description**: Shots blocked by player
+- **StatBomb Columns**: `type.name == 'Block'`, `block.block_type == 'Shot Block'`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
+
 ## Progression & Final Third
 
 ### line_breaking_receipts
@@ -199,6 +236,21 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Percentage of aerial duels won
 - **StatBomb Columns**: `duel.type.name == 'Aerial Lost/Won'`, `duel.outcome.name`
 - **Aggregation**: wins / contested
+- **Note**: ⚠️ Calculation error detected in current implementation
+
+### sliding_tackles
+- **Category**: Duels & Aerial
+- **Description**: Sliding tackles attempted
+- **StatBomb Columns**: `duel.tackle == 'Sliding Tackle'`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
+
+### sliding_tackle_success_rate
+- **Category**: Duels & Aerial
+- **Description**: Success rate of sliding tackles
+- **StatBomb Columns**: `duel.tackle == 'Sliding Tackle'`, `duel.outcome.name`
+- **Aggregation**: wins / attempts
+- **Note**: ⚠️ Calculation error detected in current implementation
 
 ### fifty_fiftys_won
 - **Category**: Duels & Aerial
@@ -270,6 +322,13 @@ This document lists the features selected for analysis based on the EDA review.
 - **StatBomb Columns**: `under_pressure`, `type.name`, `next event outcome`
 - **Aggregation**: retained / pressured_touches
 
+### weak_foot_pass_share
+- **Category**: Receiving & On-Ball Security
+- **Description**: Percentage of passes played with non-dominant foot (needs roster metadata)
+- **StatBomb Columns**: `type.name == 'Pass'`, `pass.body_part.name`
+- **Aggregation**: passes w/ weak foot / passes_attempted
+- **Note**: ⚠️ Calculation error detected in current implementation
+
 ## Link Play
 
 ### third_man_runs
@@ -330,6 +389,13 @@ This document lists the features selected for analysis based on the EDA review.
 - **StatBomb Columns**: `foul_won.advantage == True`
 - **Aggregation**: count rows
 
+### tactical_fouls
+- **Category**: Discipline
+- **Description**: Fouls labeled tactical or stopping attack
+- **StatBomb Columns**: `foul_committed.type.name`, `foul_committed.card.name`
+- **Aggregation**: count rows
+- **Note**: ⚠️ Calculation error detected in current implementation
+
 ## Set Pieces
 
 ### set_piece_involvements
@@ -360,18 +426,20 @@ This document lists the features selected for analysis based on the EDA review.
 
 ## Summary
 
-**Total Selected Features**: 55
+**Total Selected Features**: 64
 
 - Possession & Tempo: 3
 - Passing Quality: 6
-- Carrying & Dribbling: 6
-- Defensive Contribution: 9
+- Carrying & Dribbling: 9
+- Defensive Contribution: 11
 - Progression & Final Third: 5
-- Duels & Aerial: 3
+- Duels & Aerial: 5
 - Spatial Control: 4
-- Receiving & On-Ball Security: 6
+- Receiving & On-Ball Security: 7
 - Link Play: 2
 - Attacking Creation: 4
-- Discipline: 3
+- Discipline: 4
 - Set Pieces: 4
+
+**Note**: 12 features have calculation errors detected in their current implementation (marked with ⚠️ in their descriptions).
 
