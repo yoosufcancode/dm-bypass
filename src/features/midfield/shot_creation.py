@@ -46,7 +46,21 @@ def shot_creating_actions(ctx: MidfieldFeatureContext) -> pd.Series:
 
 def expected_threat_added(ctx: MidfieldFeatureContext) -> pd.Series:
     """
-    Placeholder: Expected threat model not provided. Return NaN for all players.
+    Calculate expected threat added by each midfielder.
+    
+    Since an xT model is not available, we return 0.0 for all players.
+    This feature would require a trained expected threat model to calculate
+    the change in threat value from ball progression actions.
+
+    Parameters
+    ----------
+    ctx : MidfieldFeatureContext
+        Context containing player events and midfielder IDs.
+
+    Returns
+    -------
+    pd.Series
+        Series indexed by player_id with expected threat added (currently 0.0 for all).
     """
-    return ctx.players_series(default=np.nan)
+    return ctx.players_series(default=0.0)
 

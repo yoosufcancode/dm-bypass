@@ -67,7 +67,7 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Total carries
 - **StatBomb Columns**: `type.name == 'Carry'`, `player.id`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: Maximum value of 119 per match is humanly impossible. **Root Cause**: Code counts all "Carry" events without validation. May be counting duplicate events or including invalid carries. Need to verify data quality and add filtering logic.
 
 ### final_third_carries
 - **Category**: Carrying & Dribbling
@@ -98,28 +98,28 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Success of carries attempted under pressure
 - **StatBomb Columns**: `type.name == 'Carry'`, `under_pressure`, `subsequent outcome`
 - **Aggregation**: successful_pressured_carries / pressured_carries
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected in current implementation. **Root Cause**: Uses `timestamp_seconds` which should be available from context, but may have issues with time window calculation or event matching logic. Needs verification.
 
 ### successful_dribbles
 - **Category**: Carrying & Dribbling
 - **Description**: 1v1 take-ons won
 - **StatBomb Columns**: `type.name == 'Duel'`, `duel.type.name == 'Tackle'`, `duel.outcome.name` contains 'Won', `player.id`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code incorrectly searches for `type_name == "Take On"` instead of `type_name == "Duel"` with `duel.type.name == "Tackle"`. Logic mismatch between specification and implementation.
 
 ### carries_leading_to_shot
 - **Category**: Carrying & Dribbling
 - **Description**: Carries culminating in team shot
 - **StatBomb Columns**: `carry.id` referenced by `shot.carry_id`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code checks for `carry.id` and `shot.carry_id` columns. While `shot.carry_id` is extracted in `clean_events()`, the StatsBomb data may not populate this field, or the IDs may not match between carry and shot events. The merge operation fails because no matching IDs are found.
 
 ### carries_leading_to_key_pass
 - **Category**: Carrying & Dribbling
 - **Description**: Carries ending in key pass/assist
 - **StatBomb Columns**: `carry.id` referenced by `pass.carry_id`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code checks for `pass.carry_id` column which is extracted in `clean_events()`, but the StatsBomb data may not populate this field, or the IDs may not match between carry and pass events. The merge operation fails because no matching IDs are found.
 
 ## Defensive Contribution
 
@@ -182,14 +182,14 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Pass blocks made
 - **StatBomb Columns**: `type.name == 'Block'`, `block.block_type == 'Pass Block'`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code uses `get("block.block_type")` which extracts from `block.type.name` in `clean_events()`. The comparison to `"Pass Block"` likely fails because StatsBomb uses different terminology (e.g., "Pass" instead of "Pass Block"). Need to verify actual values in `block.type.name` column.
 
 ### blocked_shots
 - **Category**: Defensive Contribution
 - **Description**: Shots blocked by player
 - **StatBomb Columns**: `type.name == 'Block'`, `block.block_type == 'Shot Block'`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code uses `get("block.block_type")` which extracts from `block.type.name` in `clean_events()`. The comparison to `"Shot Block"` likely fails because StatsBomb uses different terminology (e.g., "Shot" instead of "Shot Block"). Need to verify actual values in `block.type.name` column.
 
 ## Progression & Final Third
 
@@ -236,21 +236,21 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Percentage of aerial duels won
 - **StatBomb Columns**: `duel.type.name == 'Aerial Lost/Won'`, `duel.outcome.name`
 - **Aggregation**: wins / contested
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected in current implementation. **Root Cause**: Code uses `str.contains("Aerial", na=False)` which may match incorrectly, or `duel.outcome.name` may not contain "Won" string as expected. Need to verify actual values in StatsBomb data.
 
 ### sliding_tackles
 - **Category**: Duels & Aerial
 - **Description**: Sliding tackles attempted
 - **StatBomb Columns**: `duel.tackle == 'Sliding Tackle'`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code uses `duels.get("duel.tackle")` which may return None if column doesn't exist. The `duel.tackle` field may not be populated in StatsBomb data, or the exact string value may differ from "Sliding Tackle". Need to verify actual values in the `duel.tackle` column.
 
 ### sliding_tackle_success_rate
 - **Category**: Duels & Aerial
 - **Description**: Success rate of sliding tackles
 - **StatBomb Columns**: `duel.tackle == 'Sliding Tackle'`, `duel.outcome.name`
 - **Aggregation**: wins / attempts
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero/NaN per match because sliding_tackles is zero. Cannot calculate success rate without valid attempts. **Root Cause**: Inherits the issue from `sliding_tackles` - cannot calculate success rate when no sliding tackles are detected due to the same column/value matching problems.
 
 ### fifty_fiftys_won
 - **Category**: Duels & Aerial
@@ -327,7 +327,7 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Percentage of passes played with non-dominant foot (needs roster metadata)
 - **StatBomb Columns**: `type.name == 'Pass'`, `pass.body_part.name`
 - **Aggregation**: passes w/ weak foot / passes_attempted
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are NaN, which is impossible. **Root Cause**: Code intentionally returns NaN for all players (line 114 in receiving.py: `return ctx.players_series(default=np.nan)`). The function is not implemented - it requires roster metadata to determine dominant foot, which is not available in the event data. `pass.body_part.name` exists but cannot determine "weak foot" without knowing player's dominant foot from roster data.
 
 ## Link Play
 
@@ -394,7 +394,7 @@ This document lists the features selected for analysis based on the EDA review.
 - **Description**: Fouls labeled tactical or stopping attack
 - **StatBomb Columns**: `foul_committed.type.name`, `foul_committed.card.name`
 - **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected in current implementation
+- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code checks for `foul_committed.type.name` values `["Tactical", "Professional Foul"]`, but StatsBomb may use different terminology or these specific type names may not exist in the dataset. Need to verify actual values in `foul_committed.type.name` column.
 
 ## Set Pieces
 
@@ -441,5 +441,18 @@ This document lists the features selected for analysis based on the EDA review.
 - Discipline: 4
 - Set Pieces: 4
 
-**Note**: 12 features have calculation errors detected in their current implementation (marked with ⚠️ in their descriptions).
+**Note**: 12 features have calculation errors detected in their current implementation (marked with ⚠️ in their descriptions). Root causes identified:
+
+1. **carries_attempted**: May be counting duplicate/invalid events or missing validation
+2. **successful_dribbles**: Logic error - code searches for "Take On" events instead of "Duel" events with tackle type
+3. **carries_leading_to_shot**: Missing or unlinked `carry.id`/`shot.carry_id` columns in data
+4. **carries_leading_to_key_pass**: Missing or unlinked `pass.carry_id` column in data
+5. **blocked_passes**: Column value mismatch - checking for "Pass Block" but StatsBomb may use different terminology
+6. **blocked_shots**: Column value mismatch - checking for "Shot Block" but StatsBomb may use different terminology
+7. **tactical_fouls**: Value mismatch - checking for ["Tactical", "Professional Foul"] but StatsBomb may use different terminology
+8. **sliding_tackles**: Column may not exist or value mismatch - "Sliding Tackle" string may not match StatsBomb data
+9. **sliding_tackle_success_rate**: Inherits issue from sliding_tackles
+10. **weak_foot_pass_share**: Not implemented - intentionally returns NaN (requires roster metadata for dominant foot)
+11. **pressured_carry_success_rate**: Calculation error detected (needs investigation)
+12. **aerial_duel_win_rate**: Calculation error detected (needs investigation)
 

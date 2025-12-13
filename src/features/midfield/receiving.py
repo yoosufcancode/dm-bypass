@@ -98,7 +98,11 @@ def one_touch_passes(ctx: MidfieldFeatureContext) -> pd.Series:
 
 def weak_foot_pass_share(ctx: MidfieldFeatureContext) -> pd.Series:
     """
-    Calculate share of passes with weak foot (requires roster metadata, returns NaN).
+    Calculate share of passes with weak foot.
+
+    Since roster metadata is not available, we infer the dominant foot for each player
+    based on which foot they use more frequently. The foot used less is considered
+    the weak foot.
 
     Parameters
     ----------
@@ -109,9 +113,47 @@ def weak_foot_pass_share(ctx: MidfieldFeatureContext) -> pd.Series:
     -------
     pd.Series
         Series indexed by player_id with weak foot pass share (0.0 to 1.0).
-        Returns NaN for all players as roster metadata is not available.
+        Returns NaN for players with insufficient pass data to determine dominant foot.
     """
-    return ctx.players_series(default=np.nan)
+    passes = ctx.player_events[ctx.player_events["type_name"] == "Pass"]
+    if passes.empty:
+        return ctx.players_series(default=np.nan)
+    
+    # Get body_part column
+    body_part = passes.get("pass.body_part.name")
+    if body_part is None:
+        body_part = passes.get("pass_body_part_name")
+    if body_part is None:
+        return ctx.players_series(default=np.nan)
+    
+    # Calculate weak foot share for each player
+    results = {}
+    for player_id, player_passes in passes.groupby("player_id"):
+        player_body_parts = body_part.loc[player_passes.index]
+        
+        # Count left and right foot passes
+        left_foot = (player_body_parts == "Left Foot").sum()
+        right_foot = (player_body_parts == "Right Foot").sum()
+        total_foot_passes = left_foot + right_foot
+        
+        if total_foot_passes == 0:
+            results[player_id] = np.nan
+        else:
+            # Determine weak foot (the one used less)
+            if left_foot < right_foot:
+                weak_foot_count = left_foot
+            elif right_foot < left_foot:
+                weak_foot_count = right_foot
+            else:
+                # Equal usage - can't determine, return NaN
+                results[player_id] = np.nan
+                continue
+            
+            # Calculate share
+            results[player_id] = weak_foot_count / total_foot_passes
+    
+    series = pd.Series(results, dtype=float)
+    return ctx.ensure_index(series, fill_value=np.nan)
 
 
 def pressured_retention_rate(ctx: MidfieldFeatureContext) -> pd.Series:

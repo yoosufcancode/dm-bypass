@@ -24,17 +24,18 @@ if __name__ == "__main__":
 
 from src.features.midfield import FEATURE_FUNCTIONS
 from src.features.midfield.context import MidfieldFeatureContext, get_midfielder_ids, get_position_code
+from src.features.midfield.independent_var import calculate_bypasses_per_match
 
 
 def load_config(config_path: Path = Path("config/config.yaml")) -> Dict:
     """
     Load configuration from YAML file.
-
+    
     Parameters
     ----------
     config_path : Path
         Path to config.yaml file.
-
+    
     Returns
     -------
     Dict
@@ -42,22 +43,22 @@ def load_config(config_path: Path = Path("config/config.yaml")) -> Dict:
     """
     if not config_path.exists():
         raise FileNotFoundError(f"Config file not found: {config_path}")
-
+    
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
-
+    
     return config
 
 
 def get_team_id_from_name(team_name: str) -> Optional[int]:
     """
     Get team ID from team name.
-
+    
     Parameters
     ----------
     team_name : str
         Team name.
-
+    
     Returns
     -------
     Optional[int]
@@ -73,7 +74,7 @@ def get_team_id_from_name(team_name: str) -> Optional[int]:
         "Chelsea": 33,
         "Tottenham Hotspur": 38,
     }
-
+    
     return team_name_to_id.get(team_name)
 
 
@@ -143,12 +144,12 @@ def get_midfielder_positions(raw_events: pd.DataFrame, team_id: int, midfielder_
 def load_single_json(json_path: Path) -> pd.DataFrame:
     """
     Load a single event JSON file and return as DataFrame.
-
+    
     Parameters
     ----------
     json_path : Path
         Path to JSON file.
-
+    
     Returns
     -------
     pd.DataFrame
@@ -156,7 +157,7 @@ def load_single_json(json_path: Path) -> pd.DataFrame:
     """
     with open(json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
-
+    
     df = pd.json_normalize(data, sep=".")
     df["match_id"] = int(json_path.stem) if json_path.stem.isdigit() else json_path.stem
     return df
@@ -180,7 +181,7 @@ def coalesce_outcome(df: pd.DataFrame) -> pd.Series:
                  [c for c in df.columns if c.endswith(".outcome")]
     if not candidates:
         return pd.Series([None] * len(df), index=df.index)
-
+    
     sub = df.reindex(columns=candidates)
     for c in sub.columns:
         sub[c] = sub[c].apply(lambda v: v if (pd.isna(v) or isinstance(v, str)) else str(v))
@@ -217,12 +218,12 @@ def _safe_get_bool_series(df: pd.DataFrame, column: str) -> pd.Series:
 def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     """
     Clean and standardize event DataFrame columns.
-
+    
     Parameters
     ----------
     df : pd.DataFrame
         Raw events DataFrame from JSON.
-
+    
     Returns
     -------
     pd.DataFrame
@@ -246,7 +247,7 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
         "under_pressure": _safe_get_bool_series(df, "under_pressure"),
         "id": df.get("id"),  # Event ID for linking
     })
-
+    
     # Extract location coordinates
     loc = df.get("location")
     if loc is not None:
@@ -255,7 +256,7 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     else:
         out["x"] = np.nan
         out["y"] = np.nan
-
+    
     # Pass-related features
     out["pass.length"] = df.get("pass.length")
     out["pass.end_location"] = df.get("pass.end_location")
@@ -269,6 +270,7 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     out["pass.cross"] = _safe_get_bool_series(df, "pass.cross")
     out["pass.carry_id"] = df.get("pass.carry_id")
     out["pass.outcome.name"] = df.get("pass.outcome.name")
+    out["pass.body_part.name"] = df.get("pass.body_part.name")
 
     # Standardized names for easier access
     out["pass_length"] = out["pass.length"]
@@ -283,7 +285,7 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     out["pass_cross"] = out["pass.cross"]
     out["pass_carry_id"] = out["pass.carry_id"]
     out["pass_outcome_name"] = out["pass.outcome.name"]
-
+    
     # Duel-related features
     out["duel.type.name"] = df.get("duel.type.name")
     out["duel.outcome.name"] = df.get("duel.outcome.name")
@@ -291,10 +293,10 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     out["duel_type"] = out["duel.type.name"]
     out["duel_outcome"] = out["duel.outcome.name"]
     out["duel_tackle"] = out["duel.tackle"]
-
+    
     # Counterpress
     out["counterpress"] = _safe_get_bool_series(df, "counterpress")
-
+    
     # Block-related features
     out["block.deflection"] = _safe_get_bool_series(df, "block.deflection")
     out["block.block_type"] = df.get("block.type.name")
@@ -321,6 +323,10 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     out["take_on.outcome.name"] = df.get("take_on.outcome.name")
     out["take_on_outcome_name"] = out["take_on.outcome.name"]
 
+    # Dribble
+    out["dribble.outcome.name"] = df.get("dribble.outcome.name")
+    out["dribble_outcome_name"] = out["dribble.outcome.name"]
+
     # Foul-related
     out["foul_committed.type.name"] = df.get("foul_committed.type.name")
     out["foul_committed.card.name"] = df.get("foul_committed.card.name")
@@ -328,7 +334,7 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     out["foul_committed_type_name"] = out["foul_committed.type.name"]
     out["foul_committed_card_name"] = out["foul_committed.card.name"]
     out["foul_won_advantage"] = out["foul_won.advantage"]
-
+    
     # 50/50
     out["50_50.outcome.name"] = df.get("50_50.outcome.name")
     out["50_50_outcome_name"] = out["50_50.outcome.name"]
@@ -341,14 +347,17 @@ def clean_events(df: pd.DataFrame) -> pd.DataFrame:
     out["shot_key_pass_id"] = out["shot.key_pass_id"]
     out["shot_carry_id"] = out["shot.carry_id"]
 
+    # Related events (for block type determination)
+    out["related_events"] = df.get("related_events")
+
     # Additional columns for compatibility
     out["team.id"] = out["team_id"]
     out["possession_team.id"] = out["possession_team_id"]
     out["outcome_name"] = coalesce_outcome(df)
-
+    
     # Convert timestamp to timedelta
     out["timestamp"] = pd.to_timedelta(out["timestamp"])
-
+    
     return out
 
 
@@ -358,7 +367,7 @@ def compute_all_features(
 ) -> pd.DataFrame:
     """
     Main function to compute all midfielder-level features for team and season specified in config.yaml.
-
+    
     Parameters
     ----------
     config_path : Path, optional
@@ -373,33 +382,33 @@ def compute_all_features(
     """
     if config_path is None:
         config_path = Path(__file__).parent.parent.parent / "config" / "config.yaml"
-
+    
     config = load_config(config_path)
-
+    
     dataset_config = config.get("Dataset", {})
     team_name = dataset_config.get("team_name")
     season = dataset_config.get("season")
-
+    
     if not team_name:
         raise ValueError("team_name not found in config.yaml")
     if not season:
         raise ValueError("season not found in config.yaml")
-
+    
     print("=" * 80)
     print("Feature Engineering Pipeline")
     print("=" * 80)
     print(f"Team: {team_name}")
     print(f"Season: {season}")
     print()
-
+    
     if team_id is None:
         team_id = get_team_id_from_name(team_name)
         if team_id is None:
             raise ValueError(f"Could not find team ID for '{team_name}'. Please provide team_id parameter.")
-
+    
     print(f"Team ID: {team_id}")
     print()
-
+    
     base_dir = Path(__file__).parent.parent.parent / "data" / "raw" / "events"
     team_normalized = team_name.replace(" ", "_").replace("/", "_").replace("-", "_")
     season_normalized = season.replace("/", "_")
@@ -421,7 +430,7 @@ def compute_all_features(
     print()
     print("Computing midfielder features per match...")
     print("-" * 80)
-
+    
     all_midfielder_features = []
 
     for match_idx, json_file in enumerate(json_files, 1):
@@ -442,11 +451,19 @@ def compute_all_features(
 
             ctx = MidfieldFeatureContext(
                 raw_events=raw_df,
-                events=events,
-                team_id=team_id,
+            events=events,
+            team_id=team_id,
                 midfielder_ids=midfielder_ids,
                 match_id=match_id,
             )
+
+            # Calculate bypasses per match (independent variable)
+            # This is calculated once per match, not per midfielder
+            try:
+                bypasses_count = calculate_bypasses_per_match(ctx)
+            except Exception as e:
+                print(f"   Warning: failed calculating bypasses for match {match_id}: {e}")
+                bypasses_count = 0
 
             match_midfielder_data = []
             for player_id in sorted(midfielder_ids):
@@ -467,7 +484,8 @@ def compute_all_features(
                     "team_id": team_id,
                     "team_name": team_name,
                     "season": season,
-                    "computed_at": datetime.now().isoformat()
+                    "computed_at": datetime.now().isoformat(),
+                    "bypasses_per_match": bypasses_count  # Independent variable (same for all midfielders in the match)
                 }
 
                 # Compute all features
@@ -486,14 +504,14 @@ def compute_all_features(
 
             if match_midfielder_data:
                 all_midfielder_features.extend(match_midfielder_data)
-                print(f"   Computed features for {len(match_midfielder_data)} midfielders")
+                print(f"Computed features for {len(match_midfielder_data)} midfielders")
 
         except Exception as e:
-            print(f"   Error processing match {match_id}: {e}")
-            import traceback
-            traceback.print_exc()
-            continue
-
+                print(f"Error processing match {match_id}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+    
     print()
     print("=" * 80)
     print("Feature Engineering Complete")
@@ -506,10 +524,11 @@ def compute_all_features(
 
     features_df = pd.DataFrame(all_midfielder_features)
 
-    # Reorder columns: metadata first, then features
+    # Reorder columns: metadata first, then independent variable, then features
     metadata_cols = ["player_id", "player_name", "midfielder_type", "match_id", "team_id", "team_name", "season", "computed_at"]
-    feature_cols = [c for c in features_df.columns if c not in metadata_cols]
-    features_df = features_df[metadata_cols + feature_cols]
+    independent_var_cols = ["bypasses_per_match"]
+    feature_cols = [c for c in features_df.columns if c not in metadata_cols and c not in independent_var_cols]
+    features_df = features_df[metadata_cols + independent_var_cols + feature_cols]
 
     # Round all numeric columns to 2 decimal places (except metadata columns)
     for col in feature_cols:
@@ -526,7 +545,7 @@ def compute_all_features(
     print(f"Features saved to: {output_path}")
     print(f"Shape: {features_df.shape} (rows=midfielder_match_events, columns=features)")
     print()
-
+    
     return features_df
 
 

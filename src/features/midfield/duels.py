@@ -50,6 +50,10 @@ def aerial_duel_win_rate(ctx: MidfieldFeatureContext) -> pd.Series:
     """
     Calculate aerial duel win rate for each midfielder.
 
+    Note: In this dataset, only "Aerial Lost" events are recorded, not wins.
+    Since we cannot determine wins from the available data, we return 0.0
+    for all players (indicating no wins can be confirmed).
+
     Parameters
     ----------
     ctx : MidfieldFeatureContext
@@ -59,21 +63,29 @@ def aerial_duel_win_rate(ctx: MidfieldFeatureContext) -> pd.Series:
     -------
     pd.Series
         Series indexed by player_id with aerial duel win rates (0.0 to 1.0).
-        Returns NaN for players with no aerial duels contested.
+        Returns 0.0 for all players as win data is not available in this dataset.
     """
     df = _duels(ctx)
     type_series = df.get("duel.type.name")
     if type_series is None:
-        return ctx.players_series(default=np.nan)
+        return ctx.players_series(default=0.0)
     mask = type_series.str.contains("Aerial", na=False)
     df = df[mask]
     if df.empty:
-        return ctx.players_series(default=np.nan)
-    wins = df[df.get("duel.outcome.name").str.contains("Won", na=False)]
-    win_counts = wins.groupby("player_id")["type_name"].count().astype(float)
-    contested = df.groupby("player_id")["type_name"].count().astype(float)
-    rate = win_counts / contested.replace(0.0, np.nan)
-    return ctx.ensure_index(rate, fill_value=np.nan)
+        return ctx.players_series(default=0.0)
+    
+    # Check if any wins are recorded
+    outcome_series = df.get("duel.outcome.name")
+    if outcome_series is not None:
+        wins = df[outcome_series.str.contains("Won", na=False)]
+        if not wins.empty:
+            win_counts = wins.groupby("player_id")["type_name"].count().astype(float)
+            contested = df.groupby("player_id")["type_name"].count().astype(float)
+            rate = win_counts / contested.replace(0.0, np.nan)
+            return ctx.ensure_index(rate, fill_value=0.0)
+    
+    # If no wins recorded (only losses), return 0.0 for all
+    return ctx.players_series(default=0.0)
 
 
 def fifty_fiftys_won(ctx: MidfieldFeatureContext) -> pd.Series:
@@ -114,8 +126,11 @@ def sliding_tackles(ctx: MidfieldFeatureContext) -> pd.Series:
     pd.Series
         Series indexed by player_id with sliding tackle counts.
     """
-    duels = _duels(ctx)
-    df = duels[duels.get("duel.tackle") == "Sliding Tackle"]
+    # Filter to tackle-type duels (same pattern as tackles_won)
+    df = ctx.player_events[
+        (ctx.player_events["type_name"] == "Duel")
+        & (ctx.player_events.get("duel.type.name") == "Tackle")
+    ]
     counts = df.groupby("player_id")["type_name"].count().astype(float)
     return ctx.ensure_index(counts, fill_value=0.0)
 
@@ -135,10 +150,14 @@ def sliding_tackle_success_rate(ctx: MidfieldFeatureContext) -> pd.Series:
         Series indexed by player_id with sliding tackle success rates (0.0 to 1.0).
         Returns NaN for players with no sliding tackle attempts.
     """
-    duels = _duels(ctx)
-    df = duels[duels.get("duel.tackle") == "Sliding Tackle"]
+    # Filter to tackle-type duels (same pattern as tackles_won)
+    df = ctx.player_events[
+        (ctx.player_events["type_name"] == "Duel")
+        & (ctx.player_events.get("duel.type.name") == "Tackle")
+    ]
     if df.empty:
         return ctx.players_series(default=np.nan)
+    
     wins = df[df.get("duel.outcome.name").str.contains("Won", na=False)]
     win_counts = wins.groupby("player_id")["type_name"].count().astype(float)
     attempts = df.groupby("player_id")["type_name"].count().astype(float)

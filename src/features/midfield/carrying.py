@@ -26,6 +26,9 @@ def _carries(ctx: MidfieldFeatureContext) -> pd.DataFrame:
 def carries_attempted(ctx: MidfieldFeatureContext) -> pd.Series:
     """
     Count total carries attempted by each midfielder.
+    
+    Filters out very short carries (< 10 meters) as StatsBomb includes
+    many trivial movements that don't represent meaningful ball progression.
 
     Parameters
     ----------
@@ -37,8 +40,23 @@ def carries_attempted(ctx: MidfieldFeatureContext) -> pd.Series:
     pd.Series
         Series indexed by player_id with carry attempt counts.
     """
-    df = _carries(ctx)
-    counts = df.groupby("player_id")["type_name"].count().astype(float)
+    df = _carries(ctx).copy()
+    if df.empty:
+        return ctx.players_series(default=0.0)
+    
+    # Calculate carry distances and filter out very short ones (< 10 meters)
+    df["start_x"] = df["x"]
+    df["start_y"] = df["y"]
+    df["end_x"] = df["carry_end_location"].apply(lambda loc: _extract_coordinate(loc, 0))
+    df["end_y"] = df["carry_end_location"].apply(lambda loc: _extract_coordinate(loc, 1))
+    
+    # Calculate distance in meters (pitch is ~105m x 68m, coordinates are 0-120 x 0-80)
+    df["distance"] = ((df["end_x"] - df["start_x"])**2 + (df["end_y"] - df["start_y"])**2)**0.5
+    
+    # Filter out carries less than 10 meters
+    meaningful_carries = df[df["distance"] >= 10.0]
+    
+    counts = meaningful_carries.groupby("player_id")["type_name"].count().astype(float)
     return ctx.ensure_index(counts, fill_value=0.0)
 
 
@@ -68,6 +86,9 @@ def progressive_carries(ctx: MidfieldFeatureContext) -> pd.Series:
 def carry_distance_total(ctx: MidfieldFeatureContext) -> pd.Series:
     """
     Calculate total distance covered by all carries for each midfielder.
+    
+    Filters out very short carries (< 10 meters) as StatsBomb includes
+    many trivial movements that don't represent meaningful ball progression.
 
     Parameters
     ----------
@@ -83,22 +104,25 @@ def carry_distance_total(ctx: MidfieldFeatureContext) -> pd.Series:
     if df.empty:
         return ctx.players_series(default=0.0)
 
-    def _distance(row):
-        end_loc = row.get("carry_end_location")
-        if isinstance(end_loc, (list, tuple)) and len(end_loc) >= 2:
-            dx = end_loc[0] - row["x"]
-            dy = end_loc[1] - row["y"]
-            return float(np.sqrt(dx * dx + dy * dy))
-        return 0.0
-
-    df["distance"] = df.apply(_distance, axis=1)
-    totals = df.groupby("player_id")["distance"].sum()
+    # Calculate distances and filter out very short carries (< 10 meters)
+    df["start_x"] = df["x"]
+    df["start_y"] = df["y"]
+    df["end_x"] = df["carry_end_location"].apply(lambda loc: _extract_coordinate(loc, 0))
+    df["end_y"] = df["carry_end_location"].apply(lambda loc: _extract_coordinate(loc, 1))
+    
+    # Calculate distance in meters
+    df["distance"] = ((df["end_x"] - df["start_x"])**2 + (df["end_y"] - df["start_y"])**2)**0.5
+    
+    # Filter out carries less than 10 meters
+    meaningful_carries = df[df["distance"] >= 10.0]
+    
+    totals = meaningful_carries.groupby("player_id")["distance"].sum()
     return ctx.ensure_index(totals, fill_value=0.0)
 
 
 def successful_dribbles(ctx: MidfieldFeatureContext) -> pd.Series:
     """
-    Count successful dribbles (Take On events won) for each midfielder.
+    Count successful dribbles (Dribble events with Complete outcome) for each midfielder.
 
     Parameters
     ----------
@@ -110,17 +134,30 @@ def successful_dribbles(ctx: MidfieldFeatureContext) -> pd.Series:
     pd.Series
         Series indexed by player_id with successful dribble counts.
     """
-    df = ctx.player_events[
-        (ctx.player_events["type_name"] == "Take On")
-        & (ctx.player_events.get("take_on.outcome.name") == "Won")
-    ]
-    counts = df.groupby("player_id")["type_name"].count().astype(float)
+    df = ctx.player_events[ctx.player_events["type_name"] == "Dribble"]
+    if df.empty:
+        return ctx.players_series(default=0.0)
+    # Check for dribble.outcome.name == "Complete"
+    dribble_outcome = df.get("dribble.outcome.name")
+    if dribble_outcome is None:
+        # Try alternative column name
+        dribble_outcome = df.get("dribble_outcome_name")
+    if dribble_outcome is not None:
+        successful = df[dribble_outcome == "Complete"]
+        counts = successful.groupby("player_id")["type_name"].count().astype(float)
+    else:
+        # If outcome column doesn't exist, return zeros
+        counts = pd.Series(dtype=float)
     return ctx.ensure_index(counts, fill_value=0.0)
 
 
 def carries_leading_to_shot(ctx: MidfieldFeatureContext) -> pd.Series:
     """
     Count carries that directly lead to a shot within the same possession.
+
+    Since StatsBomb data may not include carry_id references, we use possession
+    and timing: a carry leads to a shot if a shot occurs in the same possession
+    within 5 seconds after the carry ends.
 
     Parameters
     ----------
@@ -133,25 +170,46 @@ def carries_leading_to_shot(ctx: MidfieldFeatureContext) -> pd.Series:
         Series indexed by player_id with carry-to-shot counts.
     """
     df = _carries(ctx)
-    if df.empty or "carry.id" not in df.columns:
+    if df.empty:
         return ctx.players_series(default=0.0)
-    carry_ids = df[["player_id", "carry.id"]].dropna()
-    shot_df = ctx.team_events[ctx.team_events["type_name"] == "Shot"]
-    if "shot.carry_id" not in shot_df.columns:
+    
+    # Get shots in the same team
+    shots = ctx.team_events[ctx.team_events["type_name"] == "Shot"].copy()
+    if shots.empty:
         return ctx.players_series(default=0.0)
-    merged = carry_ids.merge(
-        shot_df[["shot.carry_id"]],
-        left_on="carry.id",
-        right_on="shot.carry_id",
-        how="inner",
-    )
-    counts = merged.groupby("player_id")["carry.id"].count().astype(float)
-    return ctx.ensure_index(counts, fill_value=0.0)
+    
+    # Sort by timestamp
+    df = df.sort_values("timestamp_seconds")
+    shots = shots.sort_values("timestamp_seconds")
+    
+    counts = {}
+    for player_id, player_carries in df.groupby("player_id"):
+        count = 0
+        for _, carry_row in player_carries.iterrows():
+            carry_time = carry_row["timestamp_seconds"]
+            possession = carry_row["possession"]
+            
+            # Find shots in same possession within 5 seconds
+            matching_shots = shots[
+                (shots["possession"] == possession)
+                & (shots["timestamp_seconds"] > carry_time)
+                & (shots["timestamp_seconds"] <= carry_time + 5)
+            ]
+            if not matching_shots.empty:
+                count += 1
+        counts[player_id] = float(count)
+    
+    series = pd.Series(counts, dtype=float)
+    return ctx.ensure_index(series, fill_value=0.0)
 
 
 def carries_leading_to_key_pass(ctx: MidfieldFeatureContext) -> pd.Series:
     """
     Count carries that directly lead to a key pass within the same possession.
+
+    Since StatsBomb data may not include carry_id references, we use possession
+    and timing: a carry leads to a key pass if a key pass occurs in the same
+    possession within 3 seconds after the carry ends.
 
     Parameters
     ----------
@@ -164,23 +222,43 @@ def carries_leading_to_key_pass(ctx: MidfieldFeatureContext) -> pd.Series:
         Series indexed by player_id with carry-to-key-pass counts.
     """
     df = _carries(ctx)
-    if df.empty or "carry.id" not in df.columns:
+    if df.empty:
         return ctx.players_series(default=0.0)
-    carry_ids = df[["player_id", "carry.id"]].dropna()
-    pass_df = ctx.team_events[
+    
+    # Get key passes (passes with shot_assist or goal_assist)
+    key_passes = ctx.team_events[
         (ctx.team_events["type_name"] == "Pass")
-        & (ctx.team_events.get("pass.shot_assist") == True)
-    ]
-    if "pass.carry_id" not in pass_df.columns:
+        & (
+            (ctx.team_events.get("pass.shot_assist") == True)
+            | (ctx.team_events.get("pass.goal_assist") == True)
+        )
+    ].copy()
+    if key_passes.empty:
         return ctx.players_series(default=0.0)
-    merged = carry_ids.merge(
-        pass_df[["pass.carry_id"]],
-        left_on="carry.id",
-        right_on="pass.carry_id",
-        how="inner",
-    )
-    counts = merged.groupby("player_id")["carry.id"].count().astype(float)
-    return ctx.ensure_index(counts, fill_value=0.0)
+    
+    # Sort by timestamp
+    df = df.sort_values("timestamp_seconds")
+    key_passes = key_passes.sort_values("timestamp_seconds")
+    
+    counts = {}
+    for player_id, player_carries in df.groupby("player_id"):
+        count = 0
+        for _, carry_row in player_carries.iterrows():
+            carry_time = carry_row["timestamp_seconds"]
+            possession = carry_row["possession"]
+            
+            # Find key passes in same possession within 3 seconds
+            matching_passes = key_passes[
+                (key_passes["possession"] == possession)
+                & (key_passes["timestamp_seconds"] > carry_time)
+                & (key_passes["timestamp_seconds"] <= carry_time + 3)
+            ]
+            if not matching_passes.empty:
+                count += 1
+        counts[player_id] = float(count)
+    
+    series = pd.Series(counts, dtype=float)
+    return ctx.ensure_index(series, fill_value=0.0)
 
 
 def final_third_carries(ctx: MidfieldFeatureContext) -> pd.Series:
@@ -200,8 +278,18 @@ def final_third_carries(ctx: MidfieldFeatureContext) -> pd.Series:
     df = _carries(ctx).copy()
     if df.empty:
         return ctx.players_series(default=0.0)
+    
+    # Calculate carry distances and filter out very short ones (< 10 meters)
+    df["start_x"] = df["x"]
+    df["start_y"] = df["y"]
     df["end_x"] = df["carry_end_location"].apply(lambda loc: _extract_coordinate(loc, 0))
-    mask = df["end_x"] > 80
+    df["end_y"] = df["carry_end_location"].apply(lambda loc: _extract_coordinate(loc, 1))
+    
+    # Calculate distance in meters
+    df["distance"] = ((df["end_x"] - df["start_x"])**2 + (df["end_y"] - df["start_y"])**2)**0.5
+    
+    # Filter: must be >= 10m AND end in final third (x >= 80)
+    mask = (df["distance"] >= 10.0) & (df["end_x"] >= 80)
     counts = df[mask].groupby("player_id")["type_name"].count().astype(float)
     return ctx.ensure_index(counts, fill_value=0.0)
 
