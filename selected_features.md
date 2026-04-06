@@ -64,10 +64,10 @@ This document lists the features selected for analysis based on the EDA review.
 
 ### carries_attempted
 - **Category**: Carrying & Dribbling
-- **Description**: Total carries
-- **StatBomb Columns**: `type.name == 'Carry'`, `player.id`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: Maximum value of 119 per match is humanly impossible. **Root Cause**: Code counts all "Carry" events without validation. May be counting duplicate events or including invalid carries. Need to verify data quality and add filtering logic.
+- **Description**: Meaningful carries (≥10m distance) — filters out trivial ball holds
+- **StatBomb Columns**: `type.name == 'Carry'`, `player.id`, `location`, `carry.end_location`
+- **Aggregation**: count carries where Euclidean distance from start to end ≥ 10 pitch units
+- **Note**: The ≥10m filter was applied to remove the large volume of sub-second, near-stationary "carry" events StatsBomb records between every touch. This changes semantics from "all carries" to "meaningful ball progression carries".
 
 ### final_third_carries
 - **Category**: Carrying & Dribbling
@@ -97,29 +97,29 @@ This document lists the features selected for analysis based on the EDA review.
 - **Category**: Carrying & Dribbling
 - **Description**: Success of carries attempted under pressure
 - **StatBomb Columns**: `type.name == 'Carry'`, `under_pressure`, `subsequent outcome`
-- **Aggregation**: successful_pressured_carries / pressured_carries
-- **Note**: ⚠️ Calculation error detected in current implementation. **Root Cause**: Uses `timestamp_seconds` which should be available from context, but may have issues with time window calculation or event matching logic. Needs verification.
+- **Aggregation**: carries under pressure not followed by Dispossessed/Miscontrol within 2s / total pressured carries
+- **Note**: Uses a 2-second event window via `timestamp_seconds` to determine if a carry ended in dispossession or miscontrol. Returns NaN for players with no pressured carries.
 
 ### successful_dribbles
 - **Category**: Carrying & Dribbling
-- **Description**: 1v1 take-ons won
-- **StatBomb Columns**: `type.name == 'Duel'`, `duel.type.name == 'Tackle'`, `duel.outcome.name` contains 'Won', `player.id`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code incorrectly searches for `type_name == "Take On"` instead of `type_name == "Duel"` with `duel.type.name == "Tackle"`. Logic mismatch between specification and implementation.
+- **Description**: Successful dribbles past opponents (take-ons completed)
+- **StatBomb Columns**: `type.name == 'Dribble'`, `dribble.outcome.name == 'Complete'`, `player.id`
+- **Aggregation**: count rows where dribble.outcome.name == "Complete"
+- **Note**: Uses StatsBomb "Dribble" event type (not "Duel") with outcome "Complete" to identify successful take-ons.
 
 ### carries_leading_to_shot
 - **Category**: Carrying & Dribbling
 - **Description**: Carries culminating in team shot
-- **StatBomb Columns**: `carry.id` referenced by `shot.carry_id`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code checks for `carry.id` and `shot.carry_id` columns. While `shot.carry_id` is extracted in `clean_events()`, the StatsBomb data may not populate this field, or the IDs may not match between carry and shot events. The merge operation fails because no matching IDs are found.
+- **StatBomb Columns**: `type.name == 'Carry'`, `possession`, `timestamp`, `type.name == 'Shot'`
+- **Aggregation**: count carries where a shot by same team occurs in the same possession within 5 seconds after carry end
+- **Note**: Uses possession + 5-second timing window instead of carry_id linking (StatsBomb does not reliably populate shot.carry_id in this dataset).
 
 ### carries_leading_to_key_pass
 - **Category**: Carrying & Dribbling
 - **Description**: Carries ending in key pass/assist
-- **StatBomb Columns**: `carry.id` referenced by `pass.carry_id`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code checks for `pass.carry_id` column which is extracted in `clean_events()`, but the StatsBomb data may not populate this field, or the IDs may not match between carry and pass events. The merge operation fails because no matching IDs are found.
+- **StatBomb Columns**: `type.name == 'Carry'`, `possession`, `timestamp`, `pass.shot_assist`, `pass.goal_assist`
+- **Aggregation**: count carries where a key pass (shot_assist or goal_assist) occurs in same possession within 3 seconds after carry end
+- **Note**: Uses possession + 3-second timing window instead of carry_id linking (StatsBomb does not reliably populate pass.carry_id in this dataset).
 
 ## Defensive Contribution
 
@@ -180,16 +180,16 @@ This document lists the features selected for analysis based on the EDA review.
 ### blocked_passes
 - **Category**: Defensive Contribution
 - **Description**: Pass blocks made
-- **StatBomb Columns**: `type.name == 'Block'`, `block.block_type == 'Pass Block'`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code uses `get("block.block_type")` which extracts from `block.type.name` in `clean_events()`. The comparison to `"Pass Block"` likely fails because StatsBomb uses different terminology (e.g., "Pass" instead of "Pass Block"). Need to verify actual values in `block.type.name` column.
+- **StatBomb Columns**: `type.name == 'Block'`, `related_events` → Pass event
+- **Aggregation**: count Block events where a related event is of type "Pass"
+- **Note**: Uses `related_events` IDs to determine block type — a block is classified as a pass block when one of its related events is a "Pass". Falls back to `block.type.name == "Pass Block"` for newer data formats.
 
 ### blocked_shots
 - **Category**: Defensive Contribution
 - **Description**: Shots blocked by player
-- **StatBomb Columns**: `type.name == 'Block'`, `block.block_type == 'Shot Block'`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code uses `get("block.block_type")` which extracts from `block.type.name` in `clean_events()`. The comparison to `"Shot Block"` likely fails because StatsBomb uses different terminology (e.g., "Shot" instead of "Shot Block"). Need to verify actual values in `block.type.name` column.
+- **StatBomb Columns**: `type.name == 'Block'`, `related_events` → Shot event
+- **Aggregation**: count Block events where a related event is of type "Shot"
+- **Note**: Uses `related_events` IDs to determine block type — a block is classified as a shot block when one of its related events is a "Shot". Falls back to `block.type.name == "Shot Block"` for newer data formats.
 
 ## Progression & Final Third
 
@@ -234,23 +234,23 @@ This document lists the features selected for analysis based on the EDA review.
 ### aerial_duel_win_rate
 - **Category**: Duels & Aerial
 - **Description**: Percentage of aerial duels won
-- **StatBomb Columns**: `duel.type.name == 'Aerial Lost/Won'`, `duel.outcome.name`
+- **StatBomb Columns**: `duel.type.name` contains "Aerial", `duel.outcome.name`
 - **Aggregation**: wins / contested
-- **Note**: ⚠️ Calculation error detected in current implementation. **Root Cause**: Code uses `str.contains("Aerial", na=False)` which may match incorrectly, or `duel.outcome.name` may not contain "Won" string as expected. Need to verify actual values in StatsBomb data.
+- **Note**: ⚠️ Data limitation: StatsBomb records the "Aerial Lost" event for the player who loses the duel, but does NOT record a corresponding "Won" event for the winner. As a result, this feature returns 0.0 for all players in this dataset. It is not a code bug — it is a structural limitation of StatsBomb's aerial duel representation in the La Liga 2014/15 data. Consider dropping this feature from the model.
 
 ### sliding_tackles
 - **Category**: Duels & Aerial
-- **Description**: Sliding tackles attempted
-- **StatBomb Columns**: `duel.tackle == 'Sliding Tackle'`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code uses `duels.get("duel.tackle")` which may return None if column doesn't exist. The `duel.tackle` field may not be populated in StatsBomb data, or the exact string value may differ from "Sliding Tackle". Need to verify actual values in the `duel.tackle` column.
+- **Description**: Tackle-type duels attempted (StatsBomb does not distinguish sliding from standing tackles)
+- **StatBomb Columns**: `type.name == 'Duel'`, `duel.type.name == 'Tackle'`
+- **Aggregation**: count all Duel events with duel.type.name == "Tackle"
+- **Note**: StatsBomb's La Liga data does not populate a "sliding tackle" field. The feature was reinterpreted to count all `Tackle`-type duels (ground duels) as the closest available proxy. The name is now a misnomer — it measures total tackle attempts, not specifically sliding tackles.
 
 ### sliding_tackle_success_rate
 - **Category**: Duels & Aerial
-- **Description**: Success rate of sliding tackles
-- **StatBomb Columns**: `duel.tackle == 'Sliding Tackle'`, `duel.outcome.name`
-- **Aggregation**: wins / attempts
-- **Note**: ⚠️ Calculation error detected: All values are zero/NaN per match because sliding_tackles is zero. Cannot calculate success rate without valid attempts. **Root Cause**: Inherits the issue from `sliding_tackles` - cannot calculate success rate when no sliding tackles are detected due to the same column/value matching problems.
+- **Description**: Success rate of tackle-type duels (win rate of all ground tackles)
+- **StatBomb Columns**: `type.name == 'Duel'`, `duel.type.name == 'Tackle'`, `duel.outcome.name` contains 'Won'
+- **Aggregation**: tackles with outcome containing "Won" / total tackle duels
+- **Note**: Inherits the reinterpretation from `sliding_tackles` — measures general tackle success rate, not specifically sliding tackles. Returns NaN for players with no tackle duels.
 
 ### fifty_fiftys_won
 - **Category**: Duels & Aerial
@@ -324,10 +324,10 @@ This document lists the features selected for analysis based on the EDA review.
 
 ### weak_foot_pass_share
 - **Category**: Receiving & On-Ball Security
-- **Description**: Percentage of passes played with non-dominant foot (needs roster metadata)
+- **Description**: Share of passes played with the less-frequently-used foot
 - **StatBomb Columns**: `type.name == 'Pass'`, `pass.body_part.name`
-- **Aggregation**: passes w/ weak foot / passes_attempted
-- **Note**: ⚠️ Calculation error detected: All values are NaN, which is impossible. **Root Cause**: Code intentionally returns NaN for all players (line 114 in receiving.py: `return ctx.players_series(default=np.nan)`). The function is not implemented - it requires roster metadata to determine dominant foot, which is not available in the event data. `pass.body_part.name` exists but cannot determine "weak foot" without knowing player's dominant foot from roster data.
+- **Aggregation**: passes with less-used foot / (left foot passes + right foot passes)
+- **Note**: Dominant foot is inferred from pass frequency within the match — the foot used more often is treated as dominant. Returns NaN for players who use both feet equally (cannot determine dominant) or who have no foot-specific pass data. Roster metadata is not used.
 
 ## Link Play
 
@@ -391,10 +391,10 @@ This document lists the features selected for analysis based on the EDA review.
 
 ### tactical_fouls
 - **Category**: Discipline
-- **Description**: Fouls labeled tactical or stopping attack
-- **StatBomb Columns**: `foul_committed.type.name`, `foul_committed.card.name`
-- **Aggregation**: count rows
-- **Note**: ⚠️ Calculation error detected: All values are zero per match, which is impossible. **Root Cause**: Code checks for `foul_committed.type.name` values `["Tactical", "Professional Foul"]`, but StatsBomb may use different terminology or these specific type names may not exist in the dataset. Need to verify actual values in `foul_committed.type.name` column.
+- **Description**: Fouls likely to be tactical in nature (proxied by yellow card)
+- **StatBomb Columns**: `type.name == 'Foul Committed'`, `foul_committed.card.name`
+- **Aggregation**: count fouls committed with a Yellow Card; falls back to type name check for ["Tactical", "Professional Foul"] if card data unavailable
+- **Note**: StatsBomb's La Liga data does not use "Tactical" or "Professional Foul" as type name values. Yellow Card was used as the primary proxy for intentional/tactical fouls. This is an approximation — not all yellow card fouls are tactical and some tactical fouls may not draw a card.
 
 ## Set Pieces
 
@@ -441,18 +441,47 @@ This document lists the features selected for analysis based on the EDA review.
 - Discipline: 4
 - Set Pieces: 4
 
-**Note**: 12 features have calculation errors detected in their current implementation (marked with ⚠️ in their descriptions). Root causes identified:
+**Implementation Status:**
 
-1. **carries_attempted**: May be counting duplicate/invalid events or missing validation
-2. **successful_dribbles**: Logic error - code searches for "Take On" events instead of "Duel" events with tackle type
-3. **carries_leading_to_shot**: Missing or unlinked `carry.id`/`shot.carry_id` columns in data
-4. **carries_leading_to_key_pass**: Missing or unlinked `pass.carry_id` column in data
-5. **blocked_passes**: Column value mismatch - checking for "Pass Block" but StatsBomb may use different terminology
-6. **blocked_shots**: Column value mismatch - checking for "Shot Block" but StatsBomb may use different terminology
-7. **tactical_fouls**: Value mismatch - checking for ["Tactical", "Professional Foul"] but StatsBomb may use different terminology
-8. **sliding_tackles**: Column may not exist or value mismatch - "Sliding Tackle" string may not match StatsBomb data
-9. **sliding_tackle_success_rate**: Inherits issue from sliding_tackles
-10. **weak_foot_pass_share**: Not implemented - intentionally returns NaN (requires roster metadata for dominant foot)
-11. **pressured_carry_success_rate**: Calculation error detected (needs investigation)
-12. **aerial_duel_win_rate**: Calculation error detected (needs investigation)
+All 12 previously flagged features have been addressed. Current status:
 
+| Feature | Status | Notes |
+|---|---|---|
+| `carries_attempted` | ✅ Fixed | Now counts carries ≥10m to remove trivial StatsBomb touch events |
+| `successful_dribbles` | ✅ Fixed | Uses "Dribble" event type + "Complete" outcome |
+| `carries_leading_to_shot` | ✅ Fixed | Uses possession + 5s timing window (carry_id unreliable in data) |
+| `carries_leading_to_key_pass` | ✅ Fixed | Uses possession + 3s timing window (carry_id unreliable in data) |
+| `blocked_passes` | ✅ Fixed | Uses `related_events` lookup to classify block type |
+| `blocked_shots` | ✅ Fixed | Uses `related_events` lookup to classify block type |
+| `tactical_fouls` | ✅ Fixed | Proxied by Yellow Card presence |
+| `sliding_tackles` | ⚠️ Reinterpreted | Counts all Tackle-type duels (StatsBomb has no sliding tackle field) |
+| `sliding_tackle_success_rate` | ⚠️ Reinterpreted | Inherits reinterpretation from `sliding_tackles` |
+| `weak_foot_pass_share` | ✅ Fixed | Infers dominant foot from within-match pass frequency |
+| `pressured_carry_success_rate` | ✅ Fixed | Uses 2s event window to detect dispossession after pressured carry |
+| `aerial_duel_win_rate` | ⚠️ Data limitation | StatsBomb records only "Aerial Lost" events; win rate cannot be computed — always returns 0.0. Consider dropping from model. |
+
+
+
+  ┌─────────────────────────────┬─────────────┬──────────────────────────────────────────────────┐
+  │           Feature           │ Aggregation │                     Meaning                      │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ passes_attempted            │ SUM         │ Total passes by all midfielders combined         │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ possession_time_seconds     │ SUM         │ Total seconds midfielders held the ball          │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ ball_receipts_total         │ SUM         │ Total receptions across all midfielders          │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ sliding_tackles             │ SUM         │ Total sliding tackles by all midfielders         │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ pressures_applied           │ SUM         │ Total pressing actions by all midfielders        │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ counterpress_actions        │ SUM         │ Total counterpressing actions by all midfielders │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ final_third_entries_by_pass │ SUM         │ Total passes that entered the final third        │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ average_position_x          │ MEAN        │ Average depth across all midfielders             │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ tempo_index                 │ MEAN        │ Average tempo score across all midfielders       │
+  ├─────────────────────────────┼─────────────┼──────────────────────────────────────────────────┤
+  │ pass_completion_rate        │ MEAN        │ Average completion rate across all midfielders   │
+  └─────────────────────────────┴─────────────┴──────────────────────────────────────────────────┘

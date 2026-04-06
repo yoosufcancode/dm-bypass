@@ -50,9 +50,10 @@ def aerial_duel_win_rate(ctx: MidfieldFeatureContext) -> pd.Series:
     """
     Calculate aerial duel win rate for each midfielder.
 
-    Note: In this dataset, only "Aerial Lost" events are recorded, not wins.
-    Since we cannot determine wins from the available data, we return 0.0
-    for all players (indicating no wins can be confirmed).
+    Data limitation: StatsBomb records "Aerial Lost" events for the losing player
+    but does NOT record a corresponding "Aerial Won" event for the winner. This means
+    win rate cannot be calculated from positive evidence. If duel.outcome.name contains
+    "Won" strings in the data, those are used; otherwise 0.0 is returned for all players.
 
     Parameters
     ----------
@@ -63,7 +64,7 @@ def aerial_duel_win_rate(ctx: MidfieldFeatureContext) -> pd.Series:
     -------
     pd.Series
         Series indexed by player_id with aerial duel win rates (0.0 to 1.0).
-        Returns 0.0 for all players as win data is not available in this dataset.
+        Returns 0.0 for all players when win data is not available in the dataset.
     """
     df = _duels(ctx)
     type_series = df.get("duel.type.name")

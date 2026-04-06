@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DM-Bypass Pipeline</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { background: #0f172a; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+    .card { background: #1e293b; border: 1px solid #334155; border-radius: 0.75rem; }
+    .btn-primary { background: #3b82f6; color: #fff; padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    .btn-secondary { background: #334155; color: #cbd5e1; padding: 0.5rem 1.25rem; border-radius: 0.5rem; font-weight: 500; cursor: pointer; }
+    .btn-secondary:hover { background: #475569; }
+    .progress-bar { background: #334155; border-radius: 9999px; height: 8px; overflow: hidden; }
+    .progress-fill { background: #3b82f6; height: 100%; border-radius: 9999px; transition: width 0.4s ease; }
+    .stage-tab { padding: 0.5rem 1rem; border-radius: 0.5rem; cursor: pointer; font-weight: 500; font-size: 0.875rem; }
+    .stage-tab.active { background: #3b82f6; color: #fff; }
+    .stage-tab.done { background: #166534; color: #bbf7d0; }
+    .stage-tab.locked { color: #475569; cursor: not-allowed; }
+    .stage-tab.pending { color: #94a3b8; }
+    .table-header { background: #0f172a; }
+    input, select, textarea { background: #0f172a; border: 1px solid #334155; border-radius: 0.5rem; color: #e2e8f0; padding: 0.5rem 0.75rem; width: 100%; }
+    input:focus, select:focus { outline: none; border-color: #3b82f6; }
+    label { font-size: 0.875rem; color: #94a3b8; margin-bottom: 0.25rem; display: block; }
+    .badge { font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 9999px; font-weight: 600; }
+    .badge-blue { background: #1d4ed8; color: #bfdbfe; }
+    .badge-green { background: #166534; color: #bbf7d0; }
+    .badge-yellow { background: #854d0e; color: #fef08a; }
+    .badge-red { background: #991b1b; color: #fecaca; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header -->
+  <header class="border-b border-slate-700 px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold text-white">DM-Bypass Pipeline</h1>
+      <p class="text-sm text-slate-400">Midfielder bypass analytics — 6-stage pipeline</p>
+    </div>
+    <div id="health-dot" class="flex items-center gap-2 text-sm text-slate-400">
+      <span class="w-2 h-2 rounded-full bg-slate-600" id="health-indicator"></span>
+      <span id="health-label">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- Stage tabs -->
+  <nav class="px-6 py-3 flex gap-2 border-b border-slate-700 overflow-x-auto" id="stage-tabs">
+    <button class="stage-tab active" data-stage="1" onclick="app.goToStage(1)">1 · Ingest</button>
+    <button class="stage-tab locked" data-stage="2" onclick="app.goToStage(2)">2 · EDA</button>
+    <button class="stage-tab locked" data-stage="3" onclick="app.goToStage(3)">3 · Features</button>
+    <button class="stage-tab locked" data-stage="4" onclick="app.goToStage(4)">4 · Models</button>
+    <button class="stage-tab locked" data-stage="5" onclick="app.goToStage(5)">5 · Best Model</button>
+    <button class="stage-tab locked" data-stage="6" onclick="app.goToStage(6)">6 · Replacements</button>
+  </nav>
+
+  <!-- Main content -->
+  <main class="p-6 max-w-6xl mx-auto">
+    <div id="stage-1" class="stage-panel"></div>
+    <div id="stage-2" class="stage-panel hidden"></div>
+    <div id="stage-3" class="stage-panel hidden"></div>
+    <div id="stage-4" class="stage-panel hidden"></div>
+    <div id="stage-5" class="stage-panel hidden"></div>
+    <div id="stage-6" class="stage-panel hidden"></div>
+  </main>
+
+  <script src="components/stage1_ingestion.js"></script>
+  <script src="components/stage2_eda.js"></script>
+  <script src="components/stage3_features.js"></script>
+  <script src="components/stage4_models.js"></script>
+  <script src="components/stage5_best_model.js"></script>
+  <script src="components/stage6_replacement.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

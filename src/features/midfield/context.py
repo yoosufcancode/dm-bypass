@@ -10,10 +10,6 @@ import pandas as pd
 
 MIDFIELD_POSITION_KEYWORDS = {
     "Midfield",
-    "Wing Back",
-    "Wing Midfield",
-    "Right Wing",
-    "Left Wing",
     "Attacking Midfield",
     "Defensive Midfield",
     "Center Midfield",
@@ -23,11 +19,7 @@ MIDFIELD_POSITION_MAP = {
     "Defensive Midfield": 0,
     "Center Midfield": 1,
     "Attacking Midfield": 2,
-    "Wing Midfield": 3,
-    "Right Wing": 4,
-    "Left Wing": 5,
-    "Wing Back": 6,
-    "Midfield": 7,
+    "Midfield": 3,
 }
 
 
@@ -62,9 +54,7 @@ def get_position_code(position_name: str) -> Optional[int]:
         "Attacking Midfield",
         "Center Midfield",
         "Wing Midfield",
-        "Wing Back",  # Check before "Right Wing" and "Left Wing"
-        "Right Wing",
-        "Left Wing",
+        "Wing Back",
         "Midfield",  # Generic fallback last
     ]
     
@@ -98,6 +88,17 @@ def _extract_coordinate(value: Optional[Iterable[float]], idx: int) -> float:
     if isinstance(value, (list, tuple)) and len(value) > idx:
         return value[idx]
     return np.nan
+
+
+def get_midfielder_ids_from_clean(events: pd.DataFrame, team_id: int) -> Set[int]:
+    """
+    Derive midfielder IDs from a cleaned (internal-schema) events DataFrame.
+
+    Used with Wyscout data where midfielder IDs are passed in directly from
+    match lineup metadata (see load_wyscout.get_midfielder_ids_wyscout).
+    This function exists as a no-op passthrough for when IDs are already known.
+    """
+    return set()
 
 
 def get_midfielder_ids(raw_events: pd.DataFrame, team_id: int) -> Set[int]:
