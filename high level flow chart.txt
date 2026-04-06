@@ -1,0 +1,17 @@
+flowchart TD
+  A[StatsBomb Open Data (JSON)] --> B[Ingest\nsrc/ingest]
+  B --> C[Events Table (processed/)]
+  C --> D[Possession Reconstruction\nsrc/possessions]
+  D --> E[Bypass Labeling (≤10s or ≤4 passes)\nsrc/label]
+  E --> F[Feature Engineering\nsrc/features]
+  F --> G[Train/Valid/Test Split\nsrc/split]
+  G --> H1[Baseline Model: Logistic Regression\nsrc/train]
+  G --> H2[Main Model: LightGBM/XGBoost\nsrc/train]
+  H1 --> I[Evaluation & Calibration\nsrc/evaluate]
+  H2 --> I
+  I --> J[Explainability: Importances & SHAP\nsrc/explain]
+  J --> K[Midfielder Profiles & What-if Simulator]
+  I --> L[Reports & Figures\nreports/figures]
+  J --> L
+  L --> M[Streamlit Dashboard\ndashboard/]
+  L --> N[Research Paper\npaper/]

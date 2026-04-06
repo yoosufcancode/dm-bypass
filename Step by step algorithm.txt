@@ -1,0 +1,49 @@
+Input:
+  - StatsBomb open-data JSON (matches, lineups, events)
+  - Config: time window T=10s, max passes P=4, pitch zones
+
+Procedure:
+1. Ingest:
+   a. Load JSON → tidy event table with (match_id, team, player, timestamp, x, y, type, outcome).
+   b. Save to data/processed/events.parquet.
+
+2. Possession Reconstruction:
+   a. Sort events by (match_id, period, timestamp).
+   b. Start a new possession when possession_team changes or a restart occurs.
+   c. Summarize each possession: start_time, end_time, start_x, start_y, team_id, n_events.
+
+3. Bypass Labeling:
+   For each opponent possession against the target team:
+     a. Define window = events within T seconds from possession start.
+     b. Count passes cumulatively; stop when passes > P.
+     c. If any event location enters our final third (x ≥ threshold) within window and passes ≤ P:
+          label bypass = 1
+        else bypass = 0
+   Save labels.
+
+4. Feature Engineering:
+   For each labeled possession, compute:
+     - Tempo: time-to-first-pressure, pressures in first 5s
+     - Defensive actions: pressures, tackles, interceptions, recoveries (rates & zones)
+     - Access control: progressive passes allowed through central lane (recent history)
+     - Compactness proxies: distances between median lines
+     Save features table with target y = bypass.
+
+5. Modeling:
+   a. Time-based split into train/valid/test.
+   b. Train logistic regression (interpretable baseline).
+   c. Train gradient-boosted trees (LightGBM/XGBoost).
+   d. Evaluate (AUC, log loss, precision/recall), check probability calibration.
+
+6. Explainability & Profiling:
+   a. Compute feature importances and SHAP values.
+   b. Create player-season vectors, cluster midfielders into profiles.
+   c. Build what-if simulator: swap profile attributes, recompute predicted bypass.
+
+7. Outputs:
+   - Saved models + metrics
+   - Figures (importance, SHAP, zone maps, trends)
+   - Streamlit dashboard (overview, zones, profiles, what-if)
+   - Research paper draft with methods, results, discussion
+
+End.

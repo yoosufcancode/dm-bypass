@@ -1,0 +1,67 @@
+Phase,Category,Attribute,Description,StatBomb Columns (examples),Aggregation (per player per match)
+Attacking,Possession & Tempo,possessions_involved,Number of Barcelona possessions where player touches the ball,"type.name, player.id, possession",count unique possessions for player.id
+Attacking,Possession & Tempo,possession_time_seconds,Total on-ball time inferred from sequential touches,"timestamp, player.id, possession","sum(diff timestamps within same possession for player.id, cap gaps at 10s)"
+Attacking,Possession & Tempo,tempo_index,Passes + carries per on-ball minute (higher = faster involvement),"type.name, player.id, possession",((passes + carries) / (possession_time_seconds / 60))
+Attacking,Possession & Tempo,turnovers,Dispossessions and miscontrols committed,"type.name in ['Dispossessed','Miscontrol'], player.id",count rows
+Attacking,Passing Quality,passes_attempted,Total passes,"type.name == 'Pass', player.id",count rows
+Attacking,Passing Quality,pass_completion_rate,Completion percentage,"pass.outcome.name, player.id",completed / attempted
+Attacking,Passing Quality,progressive_passes,Forward passes gaining ≥10m,"pass.end_location, location, player.id",count where end_x - start_x >= 10
+Attacking,Passing Quality,final_third_entries_by_pass,Passes ending in final third (x > 80),"pass.end_location, player.id",count rows
+Attacking,Passing Quality,key_passes,Passes leading to shots,pass.shot_assist == True or pass.goal_assist == True,count rows
+Attacking,Passing Quality,under_pressure_pass_share,Share of passes attempted while under pressure,"under_pressure, type.name == 'Pass', player.id",passes_under_pressure / passes_attempted
+Attacking,Carrying & Dribbling,carries_attempted,Total carries,"type.name == 'Carry', player.id",count rows
+Attacking,Carrying & Dribbling,progressive_carries,Carries adding ≥10m towards goal,"carry.end_location, location, player.id",count where end_x - start_x >= 10
+Attacking,Carrying & Dribbling,carry_distance_total,Total distance carried,"location, carry.end_location",sum Euclidean distance per carry
+Attacking,Carrying & Dribbling,successful_dribbles,1v1 take-ons won,"type.name == 'Duel', duel.type.name == 'Tackle', duel.outcome.name contains 'Won', player.id",count rows
+Defensive,Defensive Contribution,pressures_applied,Opposition events pressured,"under_pressure == True AND possession_team.id != team_id, player.id",count rows where player is defensive team
+Defensive,Defensive Contribution,ball_recoveries,Ball recoveries credited,"type.name == 'Ball Recovery', player.id",count rows
+Defensive,Defensive Contribution,interceptions,Interceptions credited,"type.name == 'Interception', player.id",count rows
+Defensive,Defensive Contribution,tackles_won,Tackles with successful outcome,"type.name == 'Duel', duel.type.name == 'Tackle' and duel.outcome.name contains 'Won', player.id",count rows
+Defensive,Defensive Contribution,press_to_interception_chain,Pressure events by player that lead to team interception within 5s,"under_pressure, possession, timestamp",count possessions where player pressure precedes team interception
+Attacking,Spatial Control,average_position_x,Mean x of player's events in open play,"location[0], player.id",mean
+Attacking,Spatial Control,average_position_y,Mean y location,"location[1], player.id",mean
+Attacking,Spatial Control,width_variance,Spread of lateral positioning,"location[1], player.id",variance
+Attacking,Spatial Control,zone_entries,Entries into central lane (35 ≤ y ≤ 45) by action type,"location[1], type.name, player.id",count events with y between 35 and 45
+Attacking,Pressure Resistance,pressured_touches,Player touches recorded while under pressure,"under_pressure, player.id",count rows
+Attacking,Pressure Resistance,pressured_touch_retention_rate,Share of pressured touches not lost within 2s,"under_pressure, type.name, next event outcome",retained / pressured_touches
+Attacking,Link Play,third_man_runs,Carries or passes immediately following teammate pass from same possession to switch flank,"possession, pass.recipient.id, carry",count qualifying sequences
+Attacking,Link Play,wall_pass_events,Give-and-go sequences where player initiates and receives within 3s,"possession, timestamp, pass",count sequences
+Attacking,Shot Creation,shot_creating_actions,Two-event sequence ending in shot (pass/carry/foul won),StatsBomb SCA manually derived,count
+Attacking,Shot Creation,expected_threat_added,Total xT contributed via passes/carries,"location, end_location, model lookup",sum xT gain
+Defensive,Discipline,fouls_committed,Fouls conceded by player,"type.name == 'Foul Won' for opponent, player.id",count rows
+Defensive,Discipline,fouls_suffered,Fouls won by player,"type.name == 'Foul Won', player.id",count rows
+Attacking,Set Pieces,set_piece_involvements,"Restarts taken or contested (corners, free kicks)","play_pattern.name, type.name, player.id",count events
+Attacking,Set Pieces,corner_delivery_accuracy,Completed corners to own teammate,"type.name == 'Pass', pass.type.name == 'Corner', pass.outcome",completed / attempted corners
+Attacking,Receiving & On-Ball Security,ball_receipts_total,Ball receipts credited to player,"type.name == 'Ball Receipt*', player.id",count rows
+Attacking,Receiving & On-Ball Security,central_lane_receipts,Receipts in central lane (35 ≤ y ≤ 45),"type.name == 'Ball Receipt*', location[1]",count rows with 35 ≤ y ≤ 45
+Attacking,Receiving & On-Ball Security,one_touch_passes,Ground passes where next team touch follows within 1s without carry,"type.name == 'Pass', pass.height.name == 'Ground Pass', possession",count qualifying sequences
+Attacking,Receiving & On-Ball Security,weak_foot_pass_share,Percentage of passes played with non-dominant foot (needs roster metadata),"type.name == 'Pass', pass.body_part.name",passes w/ weak foot / passes_attempted
+Attacking,Receiving & On-Ball Security,pressured_retention_rate,Share of pressured touches retained within 2 seconds,"under_pressure, subsequent event outcome, player.id",retained_pressured_touches / pressured_touches
+Attacking,Progression & Final Third,line_breaking_receipts,"Receipts that break opponent lines (start_x < 40, receipt_x ≥ 40)","type.name == 'Ball Receipt*', location[0], possession path",count rows meeting criteria
+Attacking,Progression & Final Third,zone14_touches,"Touches in zone 14 (78 ≤ x ≤ 102, 35 ≤ y ≤ 55)","location, player.id",count rows in zone
+Attacking,Progression & Final Third,penalty_area_deliveries,Passes ending inside penalty area,"type.name == 'Pass', pass.end_location",count rows with end_x ≥ 102 and 18-yard y bounds
+Attacking,Progression & Final Third,switches_completed,Successful switches executed by player,"type.name == 'Pass', pass.switch == True",count completed switches
+Attacking,Progression & Final Third,cross_accuracy,Cross completion rate,"type.name == 'Pass', pass.cross == True, pass.outcome",completed_crosses / attempted_crosses
+Attacking,Carrying & Dribbling,carries_leading_to_shot,Carries culminating in team shot,carry.id referenced by shot.carry_id,count rows
+Attacking,Carrying & Dribbling,carries_leading_to_key_pass,Carries ending in key pass/assist,carry.id referenced by pass.carry_id,count rows
+Attacking,Carrying & Dribbling,final_third_carries,Carries entering final third (end_x > 80),"type.name == 'Carry', carry.end_location",count rows
+Attacking,Carrying & Dribbling,penalty_area_carries,Carries ending inside penalty area,"type.name == 'Carry', carry.end_location",count rows with end_x ≥ 102
+Attacking,Carrying & Dribbling,pressured_carry_success_rate,Success of carries attempted under pressure,"type.name == 'Carry', under_pressure, subsequent outcome",successful_pressured_carries / pressured_carries
+Defensive,Defensive Contribution,counterpress_actions,Counterpress defensive actions,"counterpress == True, player.id",count rows
+Defensive,Defensive Contribution,pressure_to_self_recovery,Player pressures leading to own recovery within 5s,"under_pressure, Ball Recovery, timestamp",count sequences
+Defensive,Defensive Contribution,blocked_passes,Pass blocks made,"type.name == 'Block', block.block_type == 'Pass Block'",count rows
+Defensive,Defensive Contribution,blocked_shots,Shots blocked by player,"type.name == 'Block', block.block_type == 'Shot Block'",count rows
+Defensive,Defensive Contribution,clearance_followed_by_recovery,Clearances by player with team recovery inside 5s,"type.name == 'Clearance', same possession Ball Recovery",count sequences
+Defensive,Defensive Contribution,pressures_to_turnover_rate,Pressure events forcing turnover within 3s,"under_pressure, possession change",forced_turnovers / pressures_applied
+Defensive,Duels & Aerial,aerial_duels_contested,Aerial duels participated in,"type.name == 'Duel', duel.type.name == 'Aerial Lost/Won'",count rows
+Defensive,Duels & Aerial,aerial_duel_win_rate,Percentage of aerial duels won,"duel.type.name == 'Aerial Lost/Won', duel.outcome.name",wins / contested
+Defensive,Duels & Aerial,fifty_fiftys_won,50/50 ground balls won,"type.name == '50/50', outcome",count won rows
+Defensive,Duels & Aerial,sliding_tackles,Sliding tackles attempted,duel.tackle == 'Sliding Tackle',count rows
+Defensive,Duels & Aerial,sliding_tackle_success_rate,Success rate of sliding tackles,"duel.tackle == 'Sliding Tackle', duel.outcome.name",wins / attempts
+Defensive,Fouls & Discipline,tactical_fouls,Fouls labeled tactical or stopping attack,"foul_committed.type.name, foul_committed.card.name",count rows
+Defensive,Fouls & Discipline,advantage_fouls_won,Fouls where advantage applied,foul_won.advantage == True,count rows
+Defensive,Set Pieces,set_piece_duels_won,Aerial/ground duels during defensive set pieces,"play_pattern.name in set pieces, duel outcomes",count wins
+Defensive,Set Pieces,defensive_set_piece_clearances,Clearances within 10s of opponent set piece,"play_pattern.name, type.name == 'Clearance'",count rows
+Attacking,Attacking Creation,secondary_shot_assists,Pre-assist events (second to last action before shot),"shot.key_pass_id chain, possession",count
+Attacking,Attacking Creation,expected_assists,Sum of xA on passes,"pass.shot_assist == True, shot.statsbomb_xg",sum xA
+Attacking,Attacking Creation,xg_chain,Player involvement in possessions ending in shot (xG chain),"possession, shot.statsbomb_xg, player involvement",sum xGChain
